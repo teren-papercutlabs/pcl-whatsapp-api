@@ -1119,6 +1119,19 @@ export class BaileysStartupService extends ChannelStartupService {
       settings: any,
     ) => {
       try {
+        // DEBUG: Log raw Baileys input from WhatsApp Web API
+        this.logger.debug(`[BAILEYS-RAW] messages.upsert received ${messages.length} messages, type: ${type}`);
+        messages.forEach((msg, index) => {
+          this.logger.debug(`[BAILEYS-RAW] Message ${index}: ${JSON.stringify({
+            key: msg.key,
+            pushName: msg.pushName,
+            messageTimestamp: msg.messageTimestamp,
+            messageType: msg.message ? Object.keys(msg.message)[0] : 'unknown',
+            hasParticipant: !!msg.key?.participant,
+            participant: msg.key?.participant
+          }, null, 2)}`);
+        });
+
         for (const received of messages) {
           if (received.message?.conversation || received.message?.extendedTextMessage?.text) {
             const text = received.message?.conversation || received.message?.extendedTextMessage?.text;
@@ -1267,6 +1280,18 @@ export class BaileysStartupService extends ChannelStartupService {
           }
 
           if (this.configService.get<Database>('DATABASE').SAVE_DATA.NEW_MESSAGE) {
+            // DEBUG: Log data being saved to database
+            this.logger.debug(`[DB-INSERT] Saving message to database: ${JSON.stringify({
+              id: messageRaw.id,
+              key: messageRaw.key,
+              pushName: messageRaw.pushName,
+              participant: messageRaw.participant,
+              messageType: messageRaw.messageType,
+              messageTimestamp: messageRaw.messageTimestamp,
+              instanceId: messageRaw.instanceId,
+              status: messageRaw.status
+            }, null, 2)}`);
+
             const msg = await this.prismaRepository.message.create({
               data: messageRaw,
             });
@@ -4321,12 +4346,25 @@ export class BaileysStartupService extends ChannelStartupService {
   }
 
   private prepareMessage(message: proto.IWebMessageInfo): any {
+    // DEBUG: Log input to prepareMessage
+    this.logger.debug(`[EVO-PROCESS-INPUT] prepareMessage received: ${JSON.stringify({
+      key: message.key,
+      pushName: message.pushName,
+      messageTimestamp: message.messageTimestamp,
+      status: message.status,
+      hasParticipant: !!message.key?.participant,
+      participant: message.key?.participant,
+      remoteJid: message.key?.remoteJid,
+      fromMe: message.key?.fromMe
+    }, null, 2)}`);
+
     const contentType = getContentType(message.message);
     const contentMsg = message?.message[contentType] as any;
 
     const messageRaw = {
       key: message.key,
       pushName: message.pushName,
+      participant: message.key?.participant, // FIX: Add missing participant field
       status: status[message.status],
       message: { ...message.message },
       contextInfo: contentMsg?.contextInfo,
@@ -4364,6 +4402,18 @@ export class BaileysStartupService extends ChannelStartupService {
         delete quotedMessage.documentWithCaptionMessage;
       }
     }
+
+    // DEBUG: Log output from prepareMessage
+    this.logger.debug(`[EVO-PROCESS-OUTPUT] prepareMessage result: ${JSON.stringify({
+      key: messageRaw.key,
+      pushName: messageRaw.pushName,
+      participant: messageRaw.participant,
+      messageType: messageRaw.messageType,
+      messageTimestamp: messageRaw.messageTimestamp,
+      status: messageRaw.status,
+      hasParticipant: !!messageRaw.participant,
+      instanceId: messageRaw.instanceId
+    }, null, 2)}`);
 
     return messageRaw;
   }
