@@ -9,11 +9,11 @@ LABEL contact="contato@evolution-api.com"
 
 WORKDIR /evolution
 
-COPY ./package.json ./
+COPY ./package*.json ./
 COPY ./tsconfig.json ./
 COPY ./tsup.config.ts ./
 
-RUN npm install --legacy-peer-deps
+RUN npm ci --silent
 
 COPY ./src ./src
 COPY ./public ./public
@@ -41,6 +41,7 @@ ENV DOCKER_ENV=true
 WORKDIR /evolution
 
 COPY --from=builder /evolution/package.json ./package.json
+COPY --from=builder /evolution/package-lock.json ./package-lock.json
 
 COPY --from=builder /evolution/node_modules ./node_modules
 COPY --from=builder /evolution/dist ./dist
