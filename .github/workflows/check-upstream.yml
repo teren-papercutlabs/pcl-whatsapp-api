@@ -1,0 +1,77 @@
+name: Check Evolution API Updates
+
+on:
+  schedule:
+    # Run every Monday at 9am SGT (1am UTC)
+    - cron: '0 1 * * 1'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get current version
+        id: current
+        run: |
+          # Get version from package.json
+          CURRENT=$(cat package.json | jq -r '.version')
+          echo "version=$CURRENT" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT"
+
+      - name: Get latest upstream version
+        id: upstream
+        run: |
+          # Fetch latest release from Evolution API
+          LATEST=$(curl -s https://api.github.com/repos/EvolutionAPI/evolution-api/releases/latest | jq -r '.tag_name')
+          echo "version=$LATEST" >> $GITHUB_OUTPUT
+          echo "Latest upstream version: $LATEST"
+
+      - name: Compare versions
+        id: compare
+        run: |
+          CURRENT="${{ steps.current.outputs.version }}"
+          LATEST="${{ steps.upstream.outputs.version }}"
+
+          # Strip 'v' prefix if present for comparison
+          CURRENT_CLEAN=$(echo "$CURRENT" | sed 's/^v//')
+          LATEST_CLEAN=$(echo "$LATEST" | sed 's/^v//')
+
+          if [ "$CURRENT_CLEAN" != "$LATEST_CLEAN" ]; then
+            echo "needs_update=true" >> $GITHUB_OUTPUT
+            echo "Update available: $CURRENT -> $LATEST"
+          else
+            echo "needs_update=false" >> $GITHUB_OUTPUT
+            echo "Already up to date"
+          fi
+
+      - name: Notify Slack
+        if: steps.compare.outputs.needs_update == 'true'
+        run: |
+          curl -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "channel": "C0A0HE7UCNQ",
+              "text": "🔄 *Evolution API Update Available*",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "🔄 *Evolution API Update Available*\n\n• Current: `${{ steps.current.outputs.version }}`\n• Latest: `${{ steps.upstream.outputs.version }}`"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<https://github.com/EvolutionAPI/evolution-api/releases|View Changelog> | <https://github.com/teren-papercutlabs/pcl-whatsapp-api|Update Repo>"
+                  }
+                }
+              ]
+            }'
