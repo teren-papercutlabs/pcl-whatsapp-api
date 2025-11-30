@@ -50,28 +50,10 @@ jobs:
           fi
 
       - name: Notify Slack
-        if: true # TEMP: testing notification
+        if: steps.compare.outputs.needs_update == 'true'
         run: |
-          curl -X POST https://slack.com/api/chat.postMessage \
-            -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
+          curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
             -H "Content-Type: application/json" \
             -d '{
-              "channel": "C0A0HE7UCNQ",
-              "text": "🔄 *Evolution API Update Available*",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "🔄 *Evolution API Update Available*\n\n• Current: `${{ steps.current.outputs.version }}`\n• Latest: `${{ steps.upstream.outputs.version }}`"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "<https://github.com/EvolutionAPI/evolution-api/releases|View Changelog> | <https://github.com/teren-papercutlabs/pcl-whatsapp-api|Update Repo>"
-                  }
-                }
-              ]
+              "text": "🔄 *Evolution API Update Available*\n\n• Current: `${{ steps.current.outputs.version }}`\n• Latest: `${{ steps.upstream.outputs.version }}`\n\n<https://github.com/EvolutionAPI/evolution-api/releases|View Changelog> | <https://github.com/teren-papercutlabs/pcl-whatsapp-api|Update Repo>"
             }'
