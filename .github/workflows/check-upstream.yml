@@ -50,7 +50,7 @@ jobs:
           fi
 
       - name: Notify Slack
-        if: steps.compare.outputs.needs_update == 'true'
+        if: true # TEMP: testing notification
         run: |
           curl -X POST https://slack.com/api/chat.postMessage \
             -H "Authorization: Bearer ${{ secrets.SLACK_BOT_TOKEN }}" \
