@@ -25,6 +25,7 @@ import compression from 'compression';
 import cors from 'cors';
 import express, { json, NextFunction, Request, Response, urlencoded } from 'express';
 import { join } from 'path';
+import * as cron from 'node-cron';
 
 function initWA() {
   waMonitor.loadInstance();
@@ -160,6 +161,46 @@ async function bootstrap() {
   server.listen(httpServer.PORT, () => logger.log(httpServer.TYPE.toUpperCase() + ' - ON: ' + httpServer.PORT));
 
   initWA();
+
+  // Set up cron job to set all instances to unavailable every 5 minutes
+  cron.schedule('*/5 * * * *', async () => {
+    const logger = new Logger('PRESENCE_CRON');
+    try {
+      logger.info('Setting all instances to unavailable...');
+      
+      // Get all instances
+      const instances = await prismaRepository.instance.findMany({
+        where: { connectionStatus: 'open' }
+      });
+
+      for (const instance of instances) {
+        try {
+          const serverUrl = configService.get<HttpServer>('SERVER').URL;
+          const apiKey = configService.get<Auth>('AUTHENTICATION').API_KEY.KEY;
+          
+          // URL encode the instance name for the API call
+          const encodedName = encodeURIComponent(instance.name);
+          
+          await axios.post(
+            `${serverUrl}/instance/setPresence/${encodedName}`,
+            { presence: 'unavailable' },
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': apiKey
+              }
+            }
+          );
+          
+          logger.info(`Set presence unavailable for instance: ${instance.name}`);
+        } catch (error) {
+          logger.error(`Failed to set presence for ${instance.name}: ${error.message}`);
+        }
+      }
+    } catch (error) {
+      logger.error(`Presence cron job failed: ${error.message}`);
+    }
+  });
 
   onUnexpectedError();
 }
