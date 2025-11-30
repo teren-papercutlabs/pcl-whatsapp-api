@@ -50,7 +50,7 @@ jobs:
           fi
 
       - name: Notify Slack
-        if: true # TEMP TEST
+        if: steps.compare.outputs.needs_update == 'true'
         run: |
           curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
             -H "Content-Type: application/json" \
